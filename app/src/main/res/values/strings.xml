@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Voltbell</string>
+    <string name="channel_watch">Battery watch</string>
+    <string name="channel_alert">Charge alerts</string>
+    <string name="watch_title">Watching battery</string>
+    <string name="bmc_url">https://buymeacoffee.com/wilsonsamiano</string>
+    <string name="source_url">https://github.com/wilsonsamiano/voltbell</string>
+</resources>
