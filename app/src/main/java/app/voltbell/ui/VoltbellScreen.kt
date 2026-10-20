@@ -78,6 +78,7 @@ import app.voltbell.ui.theme.Foreground
 import app.voltbell.ui.theme.Muted
 import app.voltbell.ui.theme.Subtle
 import app.voltbell.ui.theme.Warn
+import app.voltbell.update.UpdateUi
 import java.util.Date
 import kotlin.math.cos
 import kotlin.math.min
@@ -98,6 +99,9 @@ fun VoltbellScreen(
     onBatteryOpt: () -> Unit,
     onOpenSource: () -> Unit,
     onCoffee: () -> Unit,
+    update: UpdateUi,
+    onCheckUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
 ) {
     var tab by remember { mutableStateOf(Tab.WATCH) }
     val pct = battery.percent.coerceIn(0, 100)
@@ -182,6 +186,7 @@ fun VoltbellScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp),
             ) {
+                UpdateBanner(update, onInstallUpdate)
                 when (tab) {
                     Tab.WATCH -> WatchPane(
                         pct = pct,
@@ -200,6 +205,9 @@ fun VoltbellScreen(
                         settings = settings,
                         onSettings = onSettings,
                         onBatteryOpt = onBatteryOpt,
+                        update = update,
+                        onCheckUpdate = onCheckUpdate,
+                        onInstallUpdate = onInstallUpdate,
                     )
                     Tab.RULES -> RulesPane(settings, onSettings)
                     Tab.LOG -> LogPane(log)
@@ -242,6 +250,36 @@ fun VoltbellScreen(
 
         if (alert != null) {
             AlertOverlay(alert = alert, onDismiss = onDismiss, onSnooze = onSnooze)
+        }
+    }
+}
+
+@Composable
+private fun UpdateBanner(update: UpdateUi, onInstall: () -> Unit) {
+    val label = when (update) {
+        is UpdateUi.Downloading -> "Downloading ${update.version} · ${update.progress}%"
+        is UpdateUi.Ready -> "Update ${update.version} is ready"
+        else -> return
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Card)
+            .padding(16.dp),
+    ) {
+        Text(label, color = Foreground, fontSize = 15.sp)
+        if (update is UpdateUi.Ready) {
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onInstall,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Charge, contentColor = Background),
+            ) {
+                Text("Install update")
+            }
         }
     }
 }
@@ -317,6 +355,9 @@ private fun ServicePane(
     settings: Settings,
     onSettings: ((Settings) -> Settings) -> Unit,
     onBatteryOpt: () -> Unit,
+    update: UpdateUi,
+    onCheckUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
 ) {
     Column(
         Modifier
@@ -354,6 +395,25 @@ private fun ServicePane(
         colors = ButtonDefaults.buttonColors(containerColor = Card2, contentColor = Foreground),
     ) {
         Text(if (ignoringBatteryOpt) "Battery already unrestricted" else "Allow unrestricted battery")
+    }
+    Spacer(Modifier.height(12.dp))
+    val updateLabel = when (update) {
+        UpdateUi.Idle -> "Updates check when you open the app"
+        UpdateUi.Checking -> "Checking GitHub…"
+        UpdateUi.Current -> "Up to date"
+        is UpdateUi.Downloading -> "Downloading ${update.version} · ${update.progress}%"
+        is UpdateUi.Ready -> "Version ${update.version} downloaded"
+        is UpdateUi.Failed -> update.message
+    }
+    Text(updateLabel, color = Muted, fontSize = 13.sp)
+    Spacer(Modifier.height(8.dp))
+    Button(
+        onClick = if (update is UpdateUi.Ready) onInstallUpdate else onCheckUpdate,
+        modifier = Modifier.fillMaxWidth().height(48.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Card2, contentColor = Foreground),
+    ) {
+        Text(if (update is UpdateUi.Ready) "Install update" else "Check for updates")
     }
     Spacer(Modifier.height(16.dp))
     Text(

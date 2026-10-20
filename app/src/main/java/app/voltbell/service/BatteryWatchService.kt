@@ -67,6 +67,7 @@ class BatteryWatchService : Service() {
         )
         if (sticky != null) onBatteryIntent(sticky)
         VoltbellState.setServiceOn(true)
+        app.voltbell.update.AppUpdater.check(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

@@ -16,6 +16,7 @@ import app.voltbell.engine.BatterySnapshot
 object Notifications {
     const val CHANNEL_WATCH = "voltbell.watch"
     const val CHANNEL_ALERT = "voltbell.alert.v2"
+    const val CHANNEL_UPDATE = "voltbell.update"
     const val ID_WATCH = 17
     const val ID_ALERT = 18
 
@@ -41,6 +42,16 @@ object Notifications {
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 setSound(null, null)
                 enableVibration(false)
+            },
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_UPDATE,
+                "Updates",
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                description = "Voltbell app updates"
+                setShowBadge(false)
             },
         )
     }

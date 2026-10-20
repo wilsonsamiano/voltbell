@@ -31,6 +31,8 @@ Alerts fire on **threshold crossing**, not while you sit at 100%. Test alarm is 
 
 When an alarm fires, a popup covers the screen (including the lock screen) and the notification has **Dismiss** and **Snooze 15 min**. Either one stops the sound.
 
+The app checks [GitHub releases](https://github.com/wilsonsamiano/voltbell/releases) when you open it, and about every 12 hours while the watch service is running. A newer APK downloads on its own. Android still asks you to tap **Install** once — it will not replace itself silently. The first time, allow Voltbell to install unknown apps.
+
 ## Build from source
 
 Needs JDK 17 and Android SDK 35.

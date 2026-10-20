@@ -10,17 +10,23 @@ import android.provider.Settings as AndroidSettings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
 import app.voltbell.data.SettingsStore
 import app.voltbell.engine.Settings
 import app.voltbell.service.BatteryWatchService
 import app.voltbell.ui.VoltbellScreen
 import app.voltbell.ui.theme.VoltbellTheme
+import app.voltbell.update.AppUpdater
+import app.voltbell.update.UpdateUi
 
 class MainActivity : ComponentActivity() {
     private lateinit var store: SettingsStore
+    private var updateState by mutableStateOf<UpdateUi>(UpdateUi.Idle)
 
     private val notifyPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -36,6 +42,9 @@ class MainActivity : ComponentActivity() {
             notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
         syncService(store.read())
+        AppUpdater.onChange = { updateState = it }
+        updateState = AppUpdater.state
+        AppUpdater.check(this, force = true)
 
         setContent {
             val settings by VoltbellState.settings.collectAsState()
@@ -44,6 +53,10 @@ class MainActivity : ComponentActivity() {
             val log by VoltbellState.log.collectAsState()
             val serviceOn by VoltbellState.serviceOn.collectAsState()
             val ignoringOpt by VoltbellState.ignoringBatteryOpt.collectAsState()
+            val update = updateState
+            LaunchedEffect(update) {
+                if (update is UpdateUi.Ready) AppUpdater.promptIfReady(this@MainActivity)
+            }
             VoltbellTheme {
                 VoltbellScreen(
                     settings = settings,
@@ -52,6 +65,7 @@ class MainActivity : ComponentActivity() {
                     log = log,
                     serviceOn = serviceOn,
                     ignoringBatteryOpt = ignoringOpt,
+                    update = update,
                     onSettings = { patch ->
                         val next = patch(settings)
                         store.write(next)
@@ -64,6 +78,8 @@ class MainActivity : ComponentActivity() {
                     onBatteryOpt = { requestUnrestrictedBattery() },
                     onOpenSource = { openUrl(getString(R.string.source_url)) },
                     onCoffee = { openUrl(getString(R.string.bmc_url)) },
+                    onCheckUpdate = { AppUpdater.check(this, force = true) },
+                    onInstallUpdate = { AppUpdater.install(this) },
                 )
             }
         }
@@ -73,6 +89,12 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         refreshBatteryOpt()
         syncService(store.read())
+        if (intent?.action == AppUpdater.ACTION_INSTALL) {
+            AppUpdater.install(this)
+            intent.action = null
+        } else {
+            AppUpdater.promptIfReady(this)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
