@@ -167,10 +167,9 @@ class BatteryWatchService : Service() {
         VoltbellState.prependLog(entry)
         store.writeLog(VoltbellState.log.value)
 
-        if (settings.notify) {
-            val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
-            nm.notify(Notifications.ID_ALERT, Notifications.alert(this, alert))
-        }
+        val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+        nm.notify(Notifications.ID_ALERT, Notifications.alert(this, alert))
+        launchPopup()
         startSignals(alert, settings)
     }
 
@@ -198,6 +197,22 @@ class BatteryWatchService : Service() {
         }
         repeat = task
         handler.postDelayed(task, repeatMs)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun launchPopup() {
+        val pm = getSystemService(PowerManager::class.java)
+        val screen = pm.newWakeLock(
+            PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+            "voltbell:popup",
+        )
+        screen.acquire(8_000L)
+        val popup = Intent(this, app.voltbell.AlertActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        runCatching { startActivity(popup) }
+        handler.postDelayed({
+            if (screen.isHeld) screen.release()
+        }, 8_000L)
     }
 
     private fun playAlarm() {

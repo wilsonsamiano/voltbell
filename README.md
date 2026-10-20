@@ -29,6 +29,8 @@ Sideload only — this is not on Play Store.
 
 Alerts fire on **threshold crossing**, not while you sit at 100%. Test alarm is on the Watch tab.
 
+When an alarm fires, a popup covers the screen (including the lock screen) and the notification has **Dismiss** and **Snooze 15 min**. Either one stops the sound.
+
 ## Build from source
 
 Needs JDK 17 and Android SDK 35.
