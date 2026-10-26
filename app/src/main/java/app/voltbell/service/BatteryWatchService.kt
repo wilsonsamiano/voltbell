@@ -133,9 +133,21 @@ class BatteryWatchService : Service() {
         }
         val settings = store.read()
         VoltbellState.setSettings(settings)
+        val active = VoltbellState.alert.value
+        if (active?.kind == AlertKind.STOP && silenceStop(next, settings)) {
+            prev = next
+            dismissAlert()
+            return
+        }
         val kind = AlertEngine.evaluate(last, next, settings)
         prev = next
+        if (kind == AlertKind.STOP && silenceStop(next, settings)) return
         if (kind != null) fire(kind, next.percent)
+    }
+
+    private fun silenceStop(next: BatterySnapshot, settings: app.voltbell.engine.Settings): Boolean {
+        if (!next.charging) return true
+        return next.percent >= 100 && settings.stopAt < 100
     }
 
     private fun readSnapshot(intent: Intent?): BatterySnapshot {
@@ -217,11 +229,19 @@ class BatteryWatchService : Service() {
     }
 
     private fun playAlarm() {
-        try {
-            if (player?.isPlaying == true) return
-            player?.release()
-            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        if (player?.isPlaying == true) return
+        player?.release()
+        player = null
+        val stored = store.read().alarmSoundUri
+        val chosen = stored.takeIf { it.isNotBlank() }?.let { android.net.Uri.parse(it) }
+        val fallback = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        if (chosen != null && startPlayer(chosen)) return
+        if (fallback != null) startPlayer(fallback)
+    }
+
+    private fun startPlayer(uri: android.net.Uri): Boolean {
+        return try {
             player = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
@@ -234,8 +254,11 @@ class BatteryWatchService : Service() {
                 prepare()
                 start()
             }
+            true
         } catch (_: Exception) {
+            player?.release()
             player = null
+            false
         }
     }
 

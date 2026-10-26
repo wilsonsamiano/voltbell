@@ -14,7 +14,7 @@ enum class AlertKind {
 
     val hint: String
         get() = when (this) {
-            STOP -> "Stop charge to protect battery health"
+            STOP -> "Rings until you unplug, or until 100% if you leave it charging"
             FULL -> "Unplug the charger"
             LOW -> "Battery is running low"
             UNPLUG -> "Charging stopped"
@@ -54,6 +54,7 @@ data class Settings(
     val quietStart: String = "22:00",
     val quietEnd: String = "07:00",
     val backgroundWatch: Boolean = true,
+    val alarmSoundUri: String = "",
 )
 
 data class ActiveAlert(

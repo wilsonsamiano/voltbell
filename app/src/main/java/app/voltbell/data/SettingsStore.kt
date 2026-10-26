@@ -28,6 +28,7 @@ class SettingsStore(context: Context) {
         quietStart = prefs.getString("quietStart", "22:00") ?: "22:00",
         quietEnd = prefs.getString("quietEnd", "07:00") ?: "07:00",
         backgroundWatch = prefs.getBoolean("backgroundWatch", true),
+        alarmSoundUri = prefs.getString("alarmSoundUri", "") ?: "",
     )
 
     fun write(settings: Settings) {
@@ -48,6 +49,7 @@ class SettingsStore(context: Context) {
             .putString("quietStart", settings.quietStart)
             .putString("quietEnd", settings.quietEnd)
             .putBoolean("backgroundWatch", settings.backgroundWatch)
+            .putString("alarmSoundUri", settings.alarmSoundUri)
             .apply()
     }
 

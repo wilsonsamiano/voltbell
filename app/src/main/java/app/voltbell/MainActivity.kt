@@ -2,6 +2,7 @@ package app.voltbell
 
 import android.Manifest
 import android.content.Intent
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -31,6 +32,21 @@ class MainActivity : ComponentActivity() {
     private val notifyPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { /* service still starts; alerts degrade without it */ }
+
+    private val pickSound = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+        val uri = ringtoneUri(result.data)
+        val next = store.read().copy(alarmSoundUri = uri?.toString().orEmpty())
+        if (uri != null) {
+            runCatching {
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+        store.write(next)
+        VoltbellState.setSettings(next)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,6 +96,7 @@ class MainActivity : ComponentActivity() {
                     onCoffee = { openUrl(getString(R.string.bmc_url)) },
                     onCheckUpdate = { AppUpdater.check(this, force = true) },
                     onInstallUpdate = { AppUpdater.install(this) },
+                    onPickSound = { openSoundPicker() },
                 )
             }
         }
@@ -120,6 +137,32 @@ class MainActivity : ComponentActivity() {
         val intent = Intent(AndroidSettings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
             .setData(Uri.parse("package:$packageName"))
         runCatching { startActivity(intent) }
+    }
+
+    private fun openSoundPicker() {
+        val existing = store.read().alarmSoundUri
+        val current = if (existing.isNotBlank()) {
+            Uri.parse(existing)
+        } else {
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+        }
+        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Alarm sound")
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, current)
+        pickSound.launch(intent)
+    }
+
+    private fun ringtoneUri(data: Intent?): Uri? {
+        if (data == null) return null
+        return if (Build.VERSION.SDK_INT >= 33) {
+            data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        }
     }
 
     private fun openUrl(url: String) {

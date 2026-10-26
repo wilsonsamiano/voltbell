@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -79,6 +80,8 @@ import app.voltbell.ui.theme.Muted
 import app.voltbell.ui.theme.Subtle
 import app.voltbell.ui.theme.Warn
 import app.voltbell.update.UpdateUi
+import android.media.RingtoneManager
+import android.net.Uri
 import java.util.Date
 import kotlin.math.cos
 import kotlin.math.min
@@ -102,6 +105,7 @@ fun VoltbellScreen(
     update: UpdateUi,
     onCheckUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
+    onPickSound: () -> Unit,
 ) {
     var tab by remember { mutableStateOf(Tab.WATCH) }
     val pct = battery.percent.coerceIn(0, 100)
@@ -209,7 +213,7 @@ fun VoltbellScreen(
                         onCheckUpdate = onCheckUpdate,
                         onInstallUpdate = onInstallUpdate,
                     )
-                    Tab.RULES -> RulesPane(settings, onSettings)
+                    Tab.RULES -> RulesPane(settings, onSettings, onPickSound)
                     Tab.LOG -> LogPane(log)
                 }
 
@@ -425,7 +429,11 @@ private fun ServicePane(
 }
 
 @Composable
-private fun RulesPane(settings: Settings, onSettings: ((Settings) -> Settings) -> Unit) {
+private fun RulesPane(
+    settings: Settings,
+    onSettings: ((Settings) -> Settings) -> Unit,
+    onPickSound: () -> Unit,
+) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -441,6 +449,13 @@ private fun RulesPane(settings: Settings, onSettings: ((Settings) -> Settings) -
             valueRange = 50f..100f,
             colors = SliderDefaults.colors(thumbColor = Charge, activeTrackColor = Charge),
         )
+        Text(
+            "Rings until you unplug. If you leave it charging, it keeps going until 100%.",
+            color = Subtle,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+        )
+        AlarmSoundRow(settings, onPickSound)
         Spacer(Modifier.height(8.dp))
         SettingRow("Low battery", settings.lowEnabled) { onSettings { it.copy(lowEnabled = !it.lowEnabled) } }
         Text("Plug in at ${settings.lowAt}%", color = Foreground, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
@@ -461,6 +476,36 @@ private fun RulesPane(settings: Settings, onSettings: ((Settings) -> Settings) -
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
+    }
+}
+
+@Composable
+private fun AlarmSoundRow(settings: Settings, onPick: () -> Unit) {
+    val context = LocalContext.current
+    val name = remember(settings.alarmSoundUri) {
+        runCatching {
+            val uri = if (settings.alarmSoundUri.isBlank()) {
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            } else {
+                Uri.parse(settings.alarmSoundUri)
+            }
+            RingtoneManager.getRingtone(context, uri)?.getTitle(context)
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: "Default alarm"
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onPick)
+            .padding(vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Alarm sound", color = Foreground, fontSize = 15.sp)
+            Text(name, color = Muted, fontSize = 13.sp, maxLines = 1)
+        }
+        Text("Change", color = Charge, fontSize = 13.sp)
     }
 }
 

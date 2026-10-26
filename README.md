@@ -27,7 +27,7 @@ Sideload only — this is not on Play Store.
 | Quiet hours | off (22:00–07:00 when enabled) |
 | Repeat | every 12 seconds until dismissed |
 
-Alerts fire on **threshold crossing**, not while you sit at 100%. Test alarm is on the Watch tab.
+Alerts fire on **threshold crossing**, not while you sit at 100%. The unplug alarm stops by itself when you unplug. If you leave the charger in, it keeps ringing until the battery hits 100%. Pick the sound under Rules → Alarm sound. That list is the phone's own alarm sounds.
 
 When an alarm fires, a popup covers the screen (including the lock screen) and the notification has **Dismiss** and **Snooze 15 min**. Either one stops the sound.
 
