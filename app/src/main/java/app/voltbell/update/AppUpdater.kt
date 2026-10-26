@@ -33,12 +33,12 @@ sealed class UpdateUi {
 
 object AppUpdater {
     const val ACTION_INSTALL = "app.voltbell.INSTALL_UPDATE"
-    const val MIRROR = "https://cdn.jsdelivr.net/gh/wilsonsamiano/voltbell@main/android/dist/voltbell.apk"
+    const val MIRROR = "https://cdn.jsdelivr.net/gh/wilsonsamiano/voltbell@main/dist/voltbell.apk"
     private const val API = "https://api.github.com/repos/wilsonsamiano/voltbell/releases/latest"
     private val MANIFESTS = listOf(
-        "https://cdn.jsdelivr.net/gh/wilsonsamiano/voltbell@main/android/dist/version.json",
-        "https://cdn.statically.io/gh/wilsonsamiano/voltbell/main/android/dist/version.json",
-        "https://raw.githubusercontent.com/wilsonsamiano/voltbell/main/android/dist/version.json",
+        "https://cdn.jsdelivr.net/gh/wilsonsamiano/voltbell@main/dist/version.json",
+        "https://cdn.statically.io/gh/wilsonsamiano/voltbell/main/dist/version.json",
+        "https://raw.githubusercontent.com/wilsonsamiano/voltbell/main/dist/version.json",
     )
     private const val PREFS = "voltbell.updates"
     private const val NOTE_ID = 19
