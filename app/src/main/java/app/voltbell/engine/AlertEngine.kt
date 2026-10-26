@@ -18,7 +18,9 @@ object AlertEngine {
         val prevPct = prev.percent.coerceIn(0, 100)
         val nextPct = next.percent.coerceIn(0, 100)
 
-        if (settings.unplugAlert && prev.charging && !next.charging) return AlertKind.UNPLUG
+        if (settings.unplugAlert && prev.charging && !next.charging && nextPct < gate(settings)) {
+            return AlertKind.UNPLUG
+        }
         if (settings.plugAlert && !prev.charging && next.charging) return AlertKind.PLUG
 
         if (

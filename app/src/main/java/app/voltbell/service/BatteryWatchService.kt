@@ -132,23 +132,28 @@ class BatteryWatchService : Service() {
             prev = next
             return
         }
-        var settings = store.read()
-        if (!next.charging || next.percent < settings.stopAt) {
-            if (settings.delayUntil != 0) {
-                settings = settings.copy(delayUntil = 0)
-                store.write(settings)
-            }
-        }
-        VoltbellState.setSettings(settings)
+        val settings = store.read()
         val active = VoltbellState.alert.value
         if (active?.kind == AlertKind.STOP && silenceStop(active, next)) {
+            clearDelay(settings, next)
             prev = next
             dismissAlert()
             return
         }
         val kind = AlertEngine.evaluate(last, next, settings)
+        clearDelay(settings, next)
         prev = next
+        if (kind == AlertKind.UNPLUG && next.percent >= AlertEngine.gate(settings)) return
+        if (kind == AlertKind.STOP && !next.charging && next.percent >= AlertEngine.gate(settings)) return
         if (kind != null) fire(kind, next.percent)
+    }
+
+    private fun clearDelay(settings: app.voltbell.engine.Settings, next: BatterySnapshot) {
+        if (settings.delayUntil == 0) return
+        if (next.charging && next.percent >= settings.stopAt) return
+        val cleared = settings.copy(delayUntil = 0)
+        store.write(cleared)
+        VoltbellState.setSettings(cleared)
     }
 
     private fun silenceStop(active: ActiveAlert, next: BatterySnapshot): Boolean {

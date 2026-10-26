@@ -457,7 +457,7 @@ private fun RulesPane(
             colors = SliderDefaults.colors(thumbColor = Charge, activeTrackColor = Charge),
         )
         Text(
-            "Rings until you unplug, or until 100% if you leave it charging. On the alarm, delay it to the next step.",
+            "Rings until you unplug, or until 100% if you leave it charging. Unplugging at or above this level stays quiet.",
             color = Subtle,
             fontSize = 12.sp,
             lineHeight = 16.sp,
