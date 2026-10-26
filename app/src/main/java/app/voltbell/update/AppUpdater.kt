@@ -33,7 +33,13 @@ sealed class UpdateUi {
 
 object AppUpdater {
     const val ACTION_INSTALL = "app.voltbell.INSTALL_UPDATE"
+    const val MIRROR = "https://cdn.jsdelivr.net/gh/wilsonsamiano/voltbell@main/android/dist/voltbell.apk"
     private const val API = "https://api.github.com/repos/wilsonsamiano/voltbell/releases/latest"
+    private val MANIFESTS = listOf(
+        "https://cdn.jsdelivr.net/gh/wilsonsamiano/voltbell@main/android/dist/version.json",
+        "https://cdn.statically.io/gh/wilsonsamiano/voltbell/main/android/dist/version.json",
+        "https://raw.githubusercontent.com/wilsonsamiano/voltbell/main/android/dist/version.json",
+    )
     private const val PREFS = "voltbell.updates"
     private const val NOTE_ID = 19
 
@@ -75,8 +81,9 @@ object AppUpdater {
                 }
                 finish(app, UpdateUi.Ready(remote.version, file))
                 notifyReady(app, remote.version)
-            } catch (_: Exception) {
-                finish(app, UpdateUi.Failed("Couldn't reach GitHub"))
+            } catch (e: Exception) {
+                val why = e.message?.lineSequence()?.firstOrNull()?.take(160)?.trim().orEmpty()
+                finish(app, UpdateUi.Failed(if (why.isBlank()) "Couldn't reach the update server" else why), remember = false)
             }
         }
     }
@@ -96,8 +103,8 @@ object AppUpdater {
         if (launchInstaller(context, ready)) promptedFor = ready.version
     }
 
-    private fun finish(app: Context, next: UpdateUi) {
-        prefs(app).edit().putLong("checkedAt", System.currentTimeMillis()).apply()
+    private fun finish(app: Context, next: UpdateUi, remember: Boolean = true) {
+        if (remember) prefs(app).edit().putLong("checkedAt", System.currentTimeMillis()).apply()
         busy.set(false)
         publish(next)
     }
@@ -122,8 +129,36 @@ object AppUpdater {
     private data class Remote(val version: String, val url: String)
 
     private fun fetchLatest(): Remote? {
+        val errors = mutableListOf<String>()
+        try {
+            readGithubRelease()?.let { return it }
+        } catch (e: Exception) {
+            errors += "GitHub: ${brief(e)}"
+        }
+        for (manifest in MANIFESTS) {
+            try {
+                return readManifest(manifest)
+            } catch (e: Exception) {
+                errors += "${hostOf(manifest)}: ${brief(e)}"
+            }
+        }
+        error(errors.joinToString(" · ").ifBlank { "Couldn't reach the update server" })
+    }
+
+    private fun readManifest(manifestUrl: String): Remote {
+        val conn = open(manifestUrl)
+        val body = conn.inputStream.bufferedReader().use { it.readText() }
+        conn.disconnect()
+        val json = JSONObject(body)
+        val version = json.optString("version").removePrefix("v").substringBefore("-")
+        if (version.isBlank()) error("no version")
+        val apkName = json.optString("apk").ifBlank { "voltbell.apk" }
+        val base = manifestUrl.substringBeforeLast('/') + "/"
+        return Remote(version, base + apkName)
+    }
+
+    private fun readGithubRelease(): Remote? {
         val conn = open(API)
-        conn.setRequestProperty("Accept", "application/vnd.github+json")
         val body = conn.inputStream.bufferedReader().use { it.readText() }
         conn.disconnect()
         val json = JSONObject(body)
@@ -142,6 +177,14 @@ object AppUpdater {
         if (url.isBlank()) return null
         return Remote(version, url)
     }
+
+    private fun brief(e: Exception): String {
+        val msg = e.message?.lineSequence()?.firstOrNull()?.trim().orEmpty()
+        val text = if (msg.isBlank()) e.javaClass.simpleName else msg
+        return text.take(60)
+    }
+
+    private fun hostOf(url: String) = runCatching { URL(url).host }.getOrDefault(url)
 
     private fun download(url: String, dest: File, onProgress: (Int) -> Unit) {
         val conn = open(url)
@@ -174,15 +217,17 @@ object AppUpdater {
     private fun open(url: String, redirects: Int = 0): HttpURLConnection {
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.instanceFollowRedirects = false
-        conn.connectTimeout = 15_000
-        conn.readTimeout = 60_000
-        conn.setRequestProperty("User-Agent", "Voltbell")
+        conn.connectTimeout = 8_000
+        conn.readTimeout = 45_000
+        conn.setRequestProperty("User-Agent", "Voltbell/${BuildConfig.VERSION_NAME}")
+        conn.setRequestProperty("Accept", "*/*")
         conn.connect()
         if (conn.responseCode in 300..399 && redirects < 5) {
             val next = conn.getHeaderField("Location")
             conn.disconnect()
             if (next.isNullOrBlank()) error("redirect without location")
-            return open(next, redirects + 1)
+            val absolute = URL(URL(url), next).toString()
+            return open(absolute, redirects + 1)
         }
         if (conn.responseCode !in 200..299) {
             val err = conn.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()

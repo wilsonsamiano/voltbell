@@ -96,6 +96,7 @@ class MainActivity : ComponentActivity() {
                     onCoffee = { openUrl(getString(R.string.bmc_url)) },
                     onCheckUpdate = { AppUpdater.check(this, force = true) },
                     onInstallUpdate = { AppUpdater.install(this) },
+                    onOpenMirror = { openUrl(AppUpdater.MIRROR) },
                     onPickSound = { openSoundPicker() },
                     onDelay = { pct ->
                         BatteryWatchService.send(this, BatteryWatchService.ACTION_DELAY, percent = pct)

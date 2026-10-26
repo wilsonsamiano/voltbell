@@ -105,6 +105,7 @@ fun VoltbellScreen(
     update: UpdateUi,
     onCheckUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
+    onOpenMirror: () -> Unit,
     onPickSound: () -> Unit,
     onDelay: (Int) -> Unit,
 ) {
@@ -213,6 +214,7 @@ fun VoltbellScreen(
                         update = update,
                         onCheckUpdate = onCheckUpdate,
                         onInstallUpdate = onInstallUpdate,
+                        onOpenMirror = onOpenMirror,
                     )
                     Tab.RULES -> RulesPane(settings, onSettings, onPickSound)
                     Tab.LOG -> LogPane(log)
@@ -369,6 +371,7 @@ private fun ServicePane(
     update: UpdateUi,
     onCheckUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
+    onOpenMirror: () -> Unit,
 ) {
     Column(
         Modifier
@@ -410,7 +413,7 @@ private fun ServicePane(
     Spacer(Modifier.height(12.dp))
     val updateLabel = when (update) {
         UpdateUi.Idle -> "Updates check when you open the app"
-        UpdateUi.Checking -> "Checking GitHub…"
+        UpdateUi.Checking -> "Checking for an update…"
         UpdateUi.Current -> "Up to date"
         is UpdateUi.Downloading -> "Downloading ${update.version} · ${update.progress}%"
         is UpdateUi.Ready -> "Version ${update.version} downloaded"
@@ -425,6 +428,17 @@ private fun ServicePane(
         colors = ButtonDefaults.buttonColors(containerColor = Card2, contentColor = Foreground),
     ) {
         Text(if (update is UpdateUi.Ready) "Install update" else "Check for updates")
+    }
+    if (update is UpdateUi.Failed) {
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = onOpenMirror,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Card2, contentColor = Foreground),
+        ) {
+            Text("Download from mirror")
+        }
     }
     Spacer(Modifier.height(16.dp))
     Text(

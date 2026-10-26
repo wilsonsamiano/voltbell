@@ -7,6 +7,7 @@
 /app/build/
 /captures/
 *.apk
+!dist/voltbell.apk
 *.ap_
 *.aab
 *.dex
