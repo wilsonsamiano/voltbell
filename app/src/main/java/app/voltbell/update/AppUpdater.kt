@@ -188,7 +188,6 @@ object AppUpdater {
 
     private fun download(url: String, dest: File, onProgress: (Int) -> Unit) {
         val conn = open(url)
-        conn.setRequestProperty("Accept", "application/octet-stream")
         val total = conn.contentLengthLong
         dest.parentFile?.mkdirs()
         val tmp = File(dest.parentFile, dest.name + ".part")
@@ -230,10 +229,9 @@ object AppUpdater {
             return open(absolute, redirects + 1)
         }
         if (conn.responseCode !in 200..299) {
-            val err = conn.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
             val code = conn.responseCode
             conn.disconnect()
-            error("HTTP $code $err")
+            error("HTTP $code")
         }
         return conn
     }
