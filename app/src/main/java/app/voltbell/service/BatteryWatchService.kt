@@ -22,6 +22,7 @@ import android.speech.tts.TextToSpeech
 import androidx.core.content.ContextCompat
 import app.voltbell.VoltbellState
 import app.voltbell.data.SettingsStore
+import app.voltbell.audio.BuiltinSounds
 import app.voltbell.engine.ActiveAlert
 import app.voltbell.engine.AlertEngine
 import app.voltbell.engine.AlertKind
@@ -239,16 +240,28 @@ class BatteryWatchService : Service() {
         }, 8_000L)
     }
 
+    private var playingUri: String? = null
+
     private fun playAlarm() {
-        if (player?.isPlaying == true) return
+        val stored = store.read().alarmSoundUri
+        val key = stored.ifBlank { "default" }
+        if (player?.isPlaying == true && playingUri == key) return
         player?.release()
         player = null
-        val stored = store.read().alarmSoundUri
-        val chosen = stored.takeIf { it.isNotBlank() }?.let { android.net.Uri.parse(it) }
+        val builtin = BuiltinSounds.fromStored(stored)
+        val chosen = when {
+            builtin != null -> BuiltinSounds.androidUri(this, builtin)
+            stored.isNotBlank() -> android.net.Uri.parse(stored)
+            else -> null
+        }
         val fallback = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-        if (chosen != null && startPlayer(chosen)) return
-        if (fallback != null) startPlayer(fallback)
+        val started = when {
+            chosen != null && startPlayer(chosen) -> true
+            fallback != null && startPlayer(fallback) -> true
+            else -> false
+        }
+        if (started) playingUri = key
     }
 
     private fun startPlayer(uri: android.net.Uri): Boolean {
@@ -321,6 +334,7 @@ class BatteryWatchService : Service() {
         }
         player?.release()
         player = null
+        playingUri = null
         tts?.stop()
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null

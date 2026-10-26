@@ -9,6 +9,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +46,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,7 +82,10 @@ import app.voltbell.ui.theme.Foreground
 import app.voltbell.ui.theme.Muted
 import app.voltbell.ui.theme.Subtle
 import app.voltbell.ui.theme.Warn
+import app.voltbell.audio.BuiltinSounds
 import app.voltbell.update.UpdateUi
+import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
 import java.util.Date
@@ -476,7 +482,7 @@ private fun RulesPane(
             fontSize = 12.sp,
             lineHeight = 16.sp,
         )
-        AlarmSoundRow(settings, onPickSound)
+        AlarmSounds(settings, onSettings, onPickSound)
         Spacer(Modifier.height(8.dp))
         SettingRow("Low battery", settings.lowEnabled) { onSettings { it.copy(lowEnabled = !it.lowEnabled) } }
         Text("Plug in at ${settings.lowAt}%", color = Foreground, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
@@ -500,10 +506,66 @@ private fun RulesPane(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AlarmSoundRow(settings: Settings, onPick: () -> Unit) {
+private fun AlarmSounds(
+    settings: Settings,
+    onSettings: ((Settings) -> Settings) -> Unit,
+    onPickPhone: () -> Unit,
+) {
     val context = LocalContext.current
-    val name = remember(settings.alarmSoundUri) {
+    val previewPlayer = remember { mutableStateOf<MediaPlayer?>(null) }
+    DisposableEffect(Unit) {
+        onDispose { previewPlayer.value?.release() }
+    }
+    fun playPreview(uri: Uri) {
+        previewPlayer.value?.release()
+        previewPlayer.value = runCatching {
+            MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build(),
+                )
+                setDataSource(context, uri)
+                prepare()
+                start()
+            }
+        }.getOrNull()
+    }
+    val chosen = BuiltinSounds.fromStored(settings.alarmSoundUri)
+    Text("Alarm sound", color = Foreground, fontSize = 15.sp, modifier = Modifier.padding(top = 12.dp))
+    Text(
+        chosen?.title ?: "Phone ringtone",
+        color = Muted,
+        fontSize = 13.sp,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
+    BuiltinSounds.all.groupBy { it.group }.forEach { (group, sounds) ->
+        Text(group.uppercase(), color = Subtle, fontSize = 11.sp, letterSpacing = 1.5.sp, modifier = Modifier.padding(top = 6.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            sounds.forEach { sound ->
+                val on = chosen?.id == sound.id
+                Text(
+                    sound.title,
+                    color = if (on) Background else Foreground,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (on) Charge else Card2)
+                        .clickable {
+                            onSettings { it.copy(alarmSoundUri = BuiltinSounds.stored(sound.id)) }
+                            playPreview(BuiltinSounds.androidUri(context, sound))
+                        }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            }
+        }
+    }
+    val phoneName = remember(settings.alarmSoundUri) {
+        if (chosen != null) return@remember "Use a sound from this phone"
         runCatching {
             val uri = if (settings.alarmSoundUri.isBlank()) {
                 RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
@@ -516,15 +578,16 @@ private fun AlarmSoundRow(settings: Settings, onPick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
+            .padding(top = 8.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onPick)
+            .clickable(onClick = onPickPhone)
             .padding(vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Alarm sound", color = Foreground, fontSize = 15.sp)
-            Text(name, color = Muted, fontSize = 13.sp, maxLines = 1)
+            Text("Phone sounds", color = Foreground, fontSize = 15.sp)
+            Text(phoneName, color = Muted, fontSize = 13.sp, maxLines = 1)
         }
         Text("Change", color = Charge, fontSize = 13.sp)
     }
