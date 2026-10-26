@@ -29,6 +29,7 @@ class SettingsStore(context: Context) {
         quietEnd = prefs.getString("quietEnd", "07:00") ?: "07:00",
         backgroundWatch = prefs.getBoolean("backgroundWatch", true),
         alarmSoundUri = prefs.getString("alarmSoundUri", "") ?: "",
+        delayUntil = prefs.getInt("delayUntil", 0),
     )
 
     fun write(settings: Settings) {
@@ -50,6 +51,7 @@ class SettingsStore(context: Context) {
             .putString("quietEnd", settings.quietEnd)
             .putBoolean("backgroundWatch", settings.backgroundWatch)
             .putString("alarmSoundUri", settings.alarmSoundUri)
+            .putInt("delayUntil", settings.delayUntil)
             .apply()
     }
 

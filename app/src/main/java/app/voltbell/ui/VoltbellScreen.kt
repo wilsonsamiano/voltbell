@@ -106,6 +106,7 @@ fun VoltbellScreen(
     onCheckUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
     onPickSound: () -> Unit,
+    onDelay: (Int) -> Unit,
 ) {
     var tab by remember { mutableStateOf(Tab.WATCH) }
     val pct = battery.percent.coerceIn(0, 100)
@@ -253,7 +254,13 @@ fun VoltbellScreen(
         }
 
         if (alert != null) {
-            AlertOverlay(alert = alert, onDismiss = onDismiss, onSnooze = onSnooze)
+            AlertOverlay(
+                alert = alert,
+                batteryPercent = pct,
+                onDismiss = onDismiss,
+                onSnooze = onSnooze,
+                onDelay = onDelay,
+            )
         }
     }
 }
@@ -450,7 +457,7 @@ private fun RulesPane(
             colors = SliderDefaults.colors(thumbColor = Charge, activeTrackColor = Charge),
         )
         Text(
-            "Rings until you unplug. If you leave it charging, it keeps going until 100%.",
+            "Rings until you unplug, or until 100% if you leave it charging. On the alarm, delay it to the next step.",
             color = Subtle,
             fontSize = 12.sp,
             lineHeight = 16.sp,
@@ -551,7 +558,13 @@ private fun LogPane(log: List<LogEntry>) {
 }
 
 @Composable
-private fun AlertOverlay(alert: ActiveAlert, onDismiss: () -> Unit, onSnooze: (Int) -> Unit) {
+private fun AlertOverlay(
+    alert: ActiveAlert,
+    batteryPercent: Int,
+    onDismiss: () -> Unit,
+    onSnooze: (Int) -> Unit,
+    onDelay: (Int) -> Unit,
+) {
     val pulse = rememberInfiniteTransition(label = "pulse")
     val alpha by pulse.animateFloat(
         initialValue = 0.25f,
@@ -588,7 +601,20 @@ private fun AlertOverlay(alert: ActiveAlert, onDismiss: () -> Unit, onSnooze: (I
                 colors = ButtonDefaults.buttonColors(containerColor = Foreground, contentColor = Background),
             ) { Text("Dismiss") }
             Spacer(Modifier.height(10.dp))
-            TextButton(onClick = { onSnooze(15) }) { Text("Snooze 15 min", color = Muted) }
+            val choices = if (alert.kind == app.voltbell.engine.AlertKind.STOP) {
+                app.voltbell.engine.AlertEngine.delayChoices(maxOf(alert.level, batteryPercent))
+            } else {
+                emptyList()
+            }
+            if (choices.isEmpty()) {
+                TextButton(onClick = { onSnooze(15) }) { Text("Snooze 15 min", color = Muted) }
+            } else {
+                choices.forEach { step ->
+                    TextButton(onClick = { onDelay(step) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Delay to $step%", color = Muted)
+                    }
+                }
+            }
         }
     }
 }

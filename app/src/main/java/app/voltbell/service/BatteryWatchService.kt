@@ -81,6 +81,7 @@ class BatteryWatchService : Service() {
                 val minutes = intent.getIntExtra(EXTRA_MINUTES, 15)
                 snoozeAlert(minutes)
             }
+            ACTION_DELAY -> delayTo(intent.getIntExtra(EXTRA_PERCENT, 0))
             ACTION_TEST -> fire(AlertKind.STOP, VoltbellState.battery.value.percent.coerceAtLeast(80), test = true)
             ACTION_REFRESH -> {
                 val snap = VoltbellState.battery.value
@@ -131,23 +132,28 @@ class BatteryWatchService : Service() {
             prev = next
             return
         }
-        val settings = store.read()
+        var settings = store.read()
+        if (!next.charging || next.percent < settings.stopAt) {
+            if (settings.delayUntil != 0) {
+                settings = settings.copy(delayUntil = 0)
+                store.write(settings)
+            }
+        }
         VoltbellState.setSettings(settings)
         val active = VoltbellState.alert.value
-        if (active?.kind == AlertKind.STOP && silenceStop(next, settings)) {
+        if (active?.kind == AlertKind.STOP && silenceStop(active, next)) {
             prev = next
             dismissAlert()
             return
         }
         val kind = AlertEngine.evaluate(last, next, settings)
         prev = next
-        if (kind == AlertKind.STOP && silenceStop(next, settings)) return
         if (kind != null) fire(kind, next.percent)
     }
 
-    private fun silenceStop(next: BatterySnapshot, settings: app.voltbell.engine.Settings): Boolean {
+    private fun silenceStop(active: ActiveAlert, next: BatterySnapshot): Boolean {
         if (!next.charging) return true
-        return next.percent >= 100 && settings.stopAt < 100
+        return active.level < 100 && next.percent >= 100
     }
 
     private fun readSnapshot(intent: Intent?): BatterySnapshot {
@@ -285,6 +291,14 @@ class BatteryWatchService : Service() {
         nm.cancel(Notifications.ID_ALERT)
     }
 
+    private fun delayTo(percent: Int) {
+        if (percent !in 1..100) return
+        val next = store.read().copy(delayUntil = percent)
+        store.write(next)
+        VoltbellState.setSettings(next)
+        dismissAlert()
+    }
+
     private fun snoozeAlert(minutes: Int) {
         val current = VoltbellState.alert.value
         if (current != null) {
@@ -313,7 +327,9 @@ class BatteryWatchService : Service() {
         const val ACTION_SNOOZE = "app.voltbell.SNOOZE"
         const val ACTION_TEST = "app.voltbell.TEST"
         const val ACTION_REFRESH = "app.voltbell.REFRESH"
+        const val ACTION_DELAY = "app.voltbell.DELAY"
         const val EXTRA_MINUTES = "minutes"
+        const val EXTRA_PERCENT = "percent"
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(
@@ -322,9 +338,10 @@ class BatteryWatchService : Service() {
             )
         }
 
-        fun send(context: Context, action: String, minutes: Int? = null) {
+        fun send(context: Context, action: String, minutes: Int? = null, percent: Int? = null) {
             val intent = Intent(context, BatteryWatchService::class.java).setAction(action)
             if (minutes != null) intent.putExtra(EXTRA_MINUTES, minutes)
+            if (percent != null) intent.putExtra(EXTRA_PERCENT, percent)
             ContextCompat.startForegroundService(context, intent)
         }
     }

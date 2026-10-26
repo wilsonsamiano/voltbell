@@ -24,10 +24,10 @@ object AlertEngine {
         if (
             next.charging &&
             settings.stopEnabled &&
-            prevPct < settings.stopAt &&
-            nextPct >= settings.stopAt
+            prevPct < gate(settings) &&
+            nextPct >= gate(settings)
         ) {
-            return if (nextPct >= 100) AlertKind.FULL else AlertKind.STOP
+            return if (nextPct >= 100 && gate(settings) < 100) null else AlertKind.STOP
         }
 
         if (
@@ -40,6 +40,15 @@ object AlertEngine {
         }
 
         return null
+    }
+
+    fun gate(settings: Settings): Int =
+        if (settings.delayUntil > settings.stopAt) settings.delayUntil else settings.stopAt
+
+    fun delayChoices(anchor: Int): List<Int> {
+        val start = (anchor / 5 + 1) * 5
+        if (start > 100) return emptyList()
+        return (start..100 step 5).toList()
     }
 
     fun formatEta(seconds: Int, charging: Boolean, percent: Int, stopAt: Int): String {

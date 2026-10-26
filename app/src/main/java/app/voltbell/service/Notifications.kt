@@ -76,13 +76,13 @@ object Notifications {
 
     fun alert(context: Context, alert: ActiveAlert): Notification {
         val popup = popupIntent(context)
-        return NotificationCompat.Builder(context, CHANNEL_ALERT)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ALERT)
             .setSmallIcon(R.drawable.ic_stat_voltbell)
             .setContentTitle(alert.kind.title)
             .setContentText("${alert.kind.hint} · ${alert.level}%")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("${alert.kind.hint}. Battery is at ${alert.level}%. Tap Dismiss to silence."),
+                    .bigText("${alert.kind.hint}. Battery is at ${alert.level}%."),
             )
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
@@ -93,8 +93,23 @@ object Notifications {
             .setContentIntent(popup)
             .setFullScreenIntent(popup, true)
             .addAction(0, "Dismiss", serviceAction(context, BatteryWatchService.ACTION_DISMISS, 31))
-            .addAction(0, "Snooze 15 min", serviceAction(context, BatteryWatchService.ACTION_SNOOZE, 32, 15))
-            .build()
+        val choices = if (alert.kind == app.voltbell.engine.AlertKind.STOP) {
+            app.voltbell.engine.AlertEngine.delayChoices(alert.level)
+        } else {
+            emptyList()
+        }
+        if (choices.isEmpty()) {
+            builder.addAction(0, "Snooze 15 min", serviceAction(context, BatteryWatchService.ACTION_SNOOZE, 32, minutes = 15))
+        } else {
+            choices.take(2).forEach { pct ->
+                builder.addAction(
+                    0,
+                    "Delay to $pct%",
+                    serviceAction(context, BatteryWatchService.ACTION_DELAY, 40 + pct, percent = pct),
+                )
+            }
+        }
+        return builder.build()
     }
 
     private fun popupIntent(context: Context): PendingIntent =
@@ -106,9 +121,16 @@ object Notifications {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-    private fun serviceAction(context: Context, action: String, request: Int, minutes: Int? = null): PendingIntent {
+    private fun serviceAction(
+        context: Context,
+        action: String,
+        request: Int,
+        minutes: Int? = null,
+        percent: Int? = null,
+    ): PendingIntent {
         val intent = Intent(context, BatteryWatchService::class.java).setAction(action)
         if (minutes != null) intent.putExtra(BatteryWatchService.EXTRA_MINUTES, minutes)
+        if (percent != null) intent.putExtra(BatteryWatchService.EXTRA_PERCENT, percent)
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         return if (Build.VERSION.SDK_INT >= 26) {
             PendingIntent.getForegroundService(context, request, intent, flags)

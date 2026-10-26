@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -29,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.voltbell.engine.AlertEngine
+import app.voltbell.engine.AlertKind
 import app.voltbell.service.BatteryWatchService
 import app.voltbell.ui.theme.Background
 import app.voltbell.ui.theme.Card
@@ -55,10 +59,16 @@ class AlertActivity : ComponentActivity() {
 
         setContent {
             val alert by VoltbellState.alert.collectAsState()
+            val battery by VoltbellState.battery.collectAsState()
             LaunchedEffect(alert) {
                 if (alert == null) finish()
             }
             val current = alert ?: return@setContent
+            val choices = if (current.kind == AlertKind.STOP) {
+                AlertEngine.delayChoices(maxOf(current.level, battery.percent))
+            } else {
+                emptyList()
+            }
             VoltbellTheme {
                 Box(
                     Modifier
@@ -70,6 +80,7 @@ class AlertActivity : ComponentActivity() {
                     Column(
                         Modifier
                             .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
                             .background(Card, RoundedCornerShape(24.dp))
                             .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -107,14 +118,32 @@ class AlertActivity : ComponentActivity() {
                             Text("Dismiss", fontSize = 18.sp)
                         }
                         Spacer(Modifier.height(8.dp))
-                        TextButton(
-                            onClick = {
-                                BatteryWatchService.send(this@AlertActivity, BatteryWatchService.ACTION_SNOOZE, 15)
-                                finish()
-                            },
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                        ) {
-                            Text("Snooze 15 min", color = Muted, fontSize = 16.sp)
+                        if (choices.isEmpty()) {
+                            TextButton(
+                                onClick = {
+                                    BatteryWatchService.send(this@AlertActivity, BatteryWatchService.ACTION_SNOOZE, 15)
+                                    finish()
+                                },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                            ) {
+                                Text("Snooze 15 min", color = Muted, fontSize = 16.sp)
+                            }
+                        } else {
+                            choices.forEach { pct ->
+                                TextButton(
+                                    onClick = {
+                                        BatteryWatchService.send(
+                                            this@AlertActivity,
+                                            BatteryWatchService.ACTION_DELAY,
+                                            percent = pct,
+                                        )
+                                        finish()
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                                ) {
+                                    Text("Delay to $pct%", color = Muted, fontSize = 16.sp)
+                                }
+                            }
                         }
                     }
                 }

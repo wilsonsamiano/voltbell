@@ -55,6 +55,7 @@ data class Settings(
     val quietEnd: String = "07:00",
     val backgroundWatch: Boolean = true,
     val alarmSoundUri: String = "",
+    val delayUntil: Int = 0,
 )
 
 data class ActiveAlert(

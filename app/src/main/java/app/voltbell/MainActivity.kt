@@ -97,6 +97,9 @@ class MainActivity : ComponentActivity() {
                     onCheckUpdate = { AppUpdater.check(this, force = true) },
                     onInstallUpdate = { AppUpdater.install(this) },
                     onPickSound = { openSoundPicker() },
+                    onDelay = { pct ->
+                        BatteryWatchService.send(this, BatteryWatchService.ACTION_DELAY, percent = pct)
+                    },
                 )
             }
         }
